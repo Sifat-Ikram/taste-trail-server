@@ -12,6 +12,21 @@ app.use(cors({
 }));
 app.use(express.json());
 
+const verifyToken = (req, res, next) => {
+    // console.log("inside middleware", req.headers.authorization);
+    if (!req.headers.authorization) {
+        return res.status(401).send({ message: "Access forbidden" })
+    }
+    const token = req.headers.authorization.split(' ')[1];
+    jwt.verify(token, process.env.SECRET_TOKEN, (error, decoded) => {
+        if (error) {
+            return res.status(401).send({ message: "Access forbidden" })
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
+
 
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
@@ -32,6 +47,33 @@ async function run() {
     await client.connect();
 
     const menuCollection = client.db("tasteTrail").collection("menu");
+    const categoryCollection = client.db("tasteTrail").collection("category");
+
+    // middleware again
+
+    const verifyAdmin = async (req, res, next) => {
+        const email = req.decoded.email;
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        const isAdmin = user?.role === 'admin';
+        if (!isAdmin) {
+            return res.status(403).send({ message: 'Access forbidden' })
+        }
+        next();
+    }
+
+    // jwt api
+    app.post('/jwt', async (req, res) => {
+        const user = req.body;
+        const token = await jwt.sign(user, process.env.SECRET_TOKEN, { expiresIn: '1h' });
+        res.send({ token });
+    });
+
+    // category api
+    app.get("/category", async (req, res) => {
+        const result = await categoryCollection.find().toArray();
+        res.send(result);
+    });
 
     // menu api
     app.get("/menu", async (req, res) => {
