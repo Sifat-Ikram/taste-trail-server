@@ -51,6 +51,10 @@ async function run() {
     const userCollection = client.db("tasteTrail").collection("user");
     const cartCollection = client.db("tasteTrail").collection("cart");
     const orderCollection = client.db("tasteTrail").collection("order");
+    const reviewCollection = client.db("tasteTrail").collection("review");
+    const reservationCollection = client
+      .db("tasteTrail")
+      .collection("reservation");
 
     // middleware again
 
@@ -85,24 +89,19 @@ async function run() {
       res.send(result);
     });
 
-    app.get(
-      "/user/admin/:email",
-      verifyToken,
-      verifyAdmin,
-      async (req, res) => {
-        const email = req.params.email;
-        if (email !== req.decoded.email) {
-          return res.status(403).send({ message: "Access Unauthorized" });
-        }
-        const query = { email: email };
-        const user = await userCollection.findOne(query);
-        let admin = false;
-        if (user) {
-          admin = user?.role === "admin";
-        }
-        res.send({ admin });
+    app.get("/user/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "Access Unauthorized" });
       }
-    );
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role === "admin";
+      }
+      res.send({ admin });
+    });
 
     app.patch("/user/admin/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
@@ -116,9 +115,72 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/user/:id", async (req, res) => {
+      const item = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updatedDoc = {
+        $set: {
+          name: item.name,
+          email: item.email,
+          photoUrl: photoUrl,
+          gender: item.gender,
+          address: item.address,
+          birthdate: item.birthdate,
+          role: item.role,
+        },
+      };
+
+      const result = await userCollection.updateOne(
+        filter,
+        updatedDoc,
+        options
+      );
+      res.send(result);
+    });
+
+    app.delete("/user/:id", verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userCollection.deleteOne(query);
+      res.send(result);
+    });
+
     // category api
     app.get("/category", async (req, res) => {
       const result = await categoryCollection.find().toArray();
+      res.send(result);
+    });
+
+    // review api
+    app.post("/review", async (req, res) => {
+      const reviewItem = req.body;
+      const result = await reviewCollection.insertOne(reviewItem);
+      res.send(result);
+    });
+
+    app.get("/review", async (req, res) => {
+      const result = await reviewCollection.find().toArray();
+      res.send(result);
+    });
+
+    // reservation api
+    app.post("/reservation", async (req, res) => {
+      const reservationItem = req.body;
+      const result = await reservationCollection.insertOne(reservationItem);
+      res.send(result);
+    });
+
+    app.get("/reservation", async (req, res) => {
+      const result = await reservationCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.delete("/reservation/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await reservationCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -173,7 +235,14 @@ async function run() {
     });
     app.get("/cart", async (req, res) => {
       const email = req.query.email;
-      const query = { email: email };
+      const admin = req.query.admin;
+      let query = {};
+
+      if (email) {
+        query.email = email;
+      } else if (admin) {
+        query.admin = admin;
+      }
       const result = await cartCollection.find(query).toArray();
       res.send(result);
     });
