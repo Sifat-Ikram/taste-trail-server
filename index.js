@@ -1,18 +1,17 @@
 const express = require("express");
-const cors = require("cors");
 const app = express();
+const cors = require("cors");
 var jwt = require("jsonwebtoken");
 require("dotenv").config();
 const port = process.env.POST || 4321;
 
 // middle wear
-app.use(
-  cors({
-    origin: ["http://localhost:5173"],
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: ["http://localhost:5173", "https://taste-trail-web.web.app", "https://taste-trail-web.firebaseapp.com"],
+  credentials: true,
+}));
 app.use(express.json());
+
 
 const verifyToken = (req, res, next) => {
   // console.log("inside middleware", req.headers.authorization);
@@ -44,7 +43,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const menuCollection = client.db("tasteTrail").collection("menu");
     const categoryCollection = client.db("tasteTrail").collection("category");
@@ -173,6 +172,15 @@ async function run() {
     });
 
     app.get("/reservation", async (req, res) => {
+      const email = req.query.email;
+      const admin = req.query.admin;
+      let query = {};
+
+      if (email) {
+        query.email = email;
+      } else if (admin) {
+        query.admin = admin;
+      }
       const result = await reservationCollection.find().toArray();
       res.send(result);
     });
@@ -259,12 +267,12 @@ async function run() {
       const result = await orderCollection.insertOne(orderedItem);
       res.send(result);
     });
+
     app.get("/order", async (req, res) => {
-      const email = req.query.email;
-      const query = { email: email };
-      const result = await orderCollection.find(query).toArray();
+      const result = await orderCollection.find().toArray();
       res.send(result);
     });
+
     app.delete("/order/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
